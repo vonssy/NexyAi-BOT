@@ -2,7 +2,7 @@
 Nexy AI BOT
 
 - Register Here : [Nexy AI](https://point.nexyai.io/?ref=F4WFU)
-- Sign Up With Twitter
+- Login With X
 
 ## Features
 
