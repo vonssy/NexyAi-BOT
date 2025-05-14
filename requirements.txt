@@ -1,0 +1,6 @@
+aiohttp
+aiohttp-socks
+fake-useragent
+beautifulsoup4
+colorama
+pytz

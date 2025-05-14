@@ -1,0 +1,2 @@
+your_nexy_ai_access_token_1
+your_nexy_ai_access_token_2
