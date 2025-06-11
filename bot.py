@@ -60,18 +60,18 @@ class NexyAi:
         try:
             if use_proxy_choice == 1:
                 async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                    async with session.get("https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt") as response:
+                    async with session.get("https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text") as response:
                         response.raise_for_status()
                         content = await response.text()
                         with open(filename, 'w') as f:
                             f.write(content)
-                        self.proxies = content.splitlines()
+                        self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
             else:
                 if not os.path.exists(filename):
                     self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
                     return
                 with open(filename, 'r') as f:
-                    self.proxies = f.read().splitlines()
+                    self.proxies = [line.strip() for line in f.read().splitlines() if line.strip()]
             
             if not self.proxies:
                 self.log(f"{Fore.RED + Style.BRIGHT}No Proxies Found.{Style.RESET_ALL}")
@@ -131,18 +131,18 @@ class NexyAi:
     def print_question(self):
         while True:
             try:
-                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Monosans Proxy{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Proxyscrape Free Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}2. Run With Private Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}3. Run Without Proxy{Style.RESET_ALL}")
                 choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2/3] -> {Style.RESET_ALL}").strip())
 
                 if choose in [1, 2, 3]:
                     proxy_type = (
-                        "Run With Monosans Proxy" if choose == 1 else 
-                        "Run With Private Proxy" if choose == 2 else 
-                        "Run Without Proxy"
+                        "With Proxyscrape Free" if choose == 1 else 
+                        "With Private" if choose == 2 else 
+                        "Without"
                     )
-                    print(f"{Fore.GREEN + Style.BRIGHT}{proxy_type} Selected.{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN + Style.BRIGHT}Run {proxy_type} Proxy Selected.{Style.RESET_ALL}")
                     break
                 else:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
@@ -170,7 +170,14 @@ class NexyAi:
                     response.raise_for_status()
                     return True
         except (Exception, ClientResponseError) as e:
-            return None
+            self.log(
+                f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
+                f"{Fore.RED+Style.BRIGHT} Connection Not 200 OK {Style.RESET_ALL}"
+                f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+            )
+
+        return None
             
     async def rewards_statistic(self, token: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/rewards/statistic"
@@ -189,7 +196,14 @@ class NexyAi:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                return None
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Error     :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} GET Earning Stats Failed {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+                )
+
+        return None
     
     async def task_lists(self, token: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/tasks"
@@ -208,26 +222,14 @@ class NexyAi:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                return None
-            
-    async def completed_tasks(self, token: str, proxy=None, retries=5):
-        url = f"{self.BASE_API}/user-tasks/completed"
-        headers = {
-            **self.headers,
-            "Authorization": f"Bearer {token}"
-        }
-        for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
-            try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
-                return None
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Error     :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} GET Task Lists Failed {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+                )
+
+        return None
             
     async def verify_tasks(self, token: str, task_id: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/user-tasks/verify/{task_id}"
@@ -247,7 +249,14 @@ class NexyAi:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                return None
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}     > {Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT}Verifying Tasks Failed{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT} - {Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
+                )
+
+        return None
             
     async def claim_tasks(self, token: str, task_id: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/user-tasks/claim/{task_id}"
@@ -262,91 +271,64 @@ class NexyAi:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.post(url=url, headers=headers) as response:
                         if response.status == 400:
-                            return None
+                            self.log(
+                                f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
+                                f"{Fore.YELLOW+Style.BRIGHT}Already Claimed{Style.RESET_ALL}"
+                                f"{Fore.MAGENTA+Style.BRIGHT} or {Style.RESET_ALL}"
+                                f"{Fore.RED+Style.BRIGHT}Not Completed{Style.RESET_ALL}"
+                            )
+                            return False
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                return None
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}     > {Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT}Not Completed{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT} - {Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
+                )
+
+        return None
         
     async def process_check_connection(self, token: str, use_proxy: bool, rotate_proxy: bool):
-        message = "Checking Connection, Wait..."
-        if use_proxy:
-            message = "Checking Proxy Connection, Wait..."
+        while True:
+            proxy = self.get_next_proxy_for_account(token) if use_proxy else None
 
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.YELLOW + Style.BRIGHT}{message}{Style.RESET_ALL}",
-            end="\r",
-            flush=True
-        )
-
-        proxy = self.get_next_proxy_for_account(token) if use_proxy else None
-
-        if rotate_proxy:
-            is_valid = None
-            while is_valid is None:
-                is_valid = await self.check_connection(proxy)
-                if not is_valid:
-                    self.log(
-                        f"{Fore.CYAN+Style.BRIGHT}Proxy     :{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                        f"{Fore.RED+Style.BRIGHT} Not 200 OK, {Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT}Rotating Proxy...{Style.RESET_ALL}"
-                    )
-                    proxy = self.rotate_proxy_for_account(token) if use_proxy else None
-                    await asyncio.sleep(5)
-                    continue
-
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Proxy     :{Style.RESET_ALL}"
-                    f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.GREEN+Style.BRIGHT} 200 OK {Style.RESET_ALL}                  "
-                )
-                return True
-
-        is_valid = await self.check_connection(proxy)
-        if not is_valid:
             self.log(
                 f"{Fore.CYAN+Style.BRIGHT}Proxy     :{Style.RESET_ALL}"
                 f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
-                f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                f"{Fore.RED+Style.BRIGHT} Not 200 OK {Style.RESET_ALL}          "
             )
-            return False
-        
-        self.log(
-            f"{Fore.CYAN+Style.BRIGHT}Proxy     :{Style.RESET_ALL}"
-            f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
-            f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-            f"{Fore.GREEN+Style.BRIGHT} 200 OK {Style.RESET_ALL}                  "
-        )
 
-        return True
+            is_valid = await self.check_connection(proxy)
+            if is_valid:
+                return True
+            
+            if rotate_proxy:
+                proxy = self.rotate_proxy_for_account(token) if use_proxy else None
+                await asyncio.sleep(5)
+                continue
+
+            return False
 
     async def process_accounts(self, token: str, use_proxy: bool, rotate_proxy: bool):
         is_valid = await self.process_check_connection(token, use_proxy, rotate_proxy)
         if is_valid:
             proxy = self.get_next_proxy_for_account(token) if use_proxy else None
         
-            total_pts = "N/A"
             balance = await self.rewards_statistic(token, proxy)
             if balance:
                 social_pts = balance.get("data", {}).get("social",0)
                 ref_pts = balance.get("data", {}).get("ref",0)
-                follower_pts = balance.get("data", {}).get("follower",0)
 
-                total_pts = social_pts + ref_pts + follower_pts
+                total_pts = social_pts + ref_pts
 
-            self.log(
-                f"{Fore.CYAN+Style.BRIGHT}Balance   :{Style.RESET_ALL}"
-                f"{Fore.WHITE+Style.BRIGHT} {total_pts} PTS {Style.RESET_ALL}"
-            )
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Balance   :{Style.RESET_ALL}"
+                    f"{Fore.WHITE+Style.BRIGHT} {total_pts} PTS {Style.RESET_ALL}"
+                )
 
             task_lists = await self.task_lists(token, proxy)
             if task_lists:
@@ -376,7 +358,6 @@ class NexyAi:
 
                                 if status == "completed":
                                     claim = await self.claim_tasks(token, task_id, proxy)
-
                                     if claim:
                                         self.log(
                                             f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
@@ -384,11 +365,6 @@ class NexyAi:
                                             f"{Fore.MAGENTA+Style.BRIGHT} - {Style.RESET_ALL}"
                                             f"{Fore.CYAN+Style.BRIGHT}Reward:{Style.RESET_ALL}"
                                             f"{Fore.WHITE+Style.BRIGHT} {reward} PTS {Style.RESET_ALL}"
-                                        )
-                                    else:
-                                        self.log(
-                                            f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
-                                            f"{Fore.YELLOW+Style.BRIGHT}Already Claimed{Style.RESET_ALL}"
                                         )
 
                                 elif status == "in_progress":
@@ -419,27 +395,12 @@ class NexyAi:
                                                     f"{Fore.CYAN+Style.BRIGHT}Reward:{Style.RESET_ALL}"
                                                     f"{Fore.WHITE+Style.BRIGHT} {reward} PTS {Style.RESET_ALL}"
                                                 )
-                                            else:
-                                                self.log(
-                                                    f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
-                                                    f"{Fore.RED+Style.BRIGHT}Not Claimed{Style.RESET_ALL}                         "
-                                                )
+                                                
                                         else:
                                             self.log(
                                                 f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
-                                                f"{Fore.YELLOW+Style.BRIGHT}Not Ready to Claim{Style.RESET_ALL}               "
+                                                f"{Fore.YELLOW+Style.BRIGHT}Not Eligible to Claim{Style.RESET_ALL}               "
                                             )
-                                    
-                                    else:
-                                        self.log(
-                                            f"{Fore.MAGENTA+Style.BRIGHT}     > {Style.RESET_ALL}"
-                                            f"{Fore.RED+Style.BRIGHT}GET Task Status Failed{Style.RESET_ALL}              "
-                                        )
-            else:
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Task Lists:{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} GET Lists Data Failed {Style.RESET_ALL}"
-                )             
 
     async def main(self):
         try:
@@ -475,20 +436,27 @@ class NexyAi:
                             f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
                         )
 
-                        if x_name and exp_time:
+                        if not x_name or not exp_time:
                             self.log(
-                                f"{Fore.CYAN+Style.BRIGHT}Account   :{Style.RESET_ALL}"
-                                f"{Fore.WHITE+Style.BRIGHT} {x_name} {Style.RESET_ALL}"
+                                f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
+                                f"{Fore.RED+Style.BRIGHT} Invalid Access Token {Style.RESET_ALL}"
                             )
-                            if int(time.time()) > exp_time:
-                                self.log(
-                                    f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
-                                    f"{Fore.RED+Style.BRIGHT} Access Token Already Expired {Style.RESET_ALL}"
-                                )
-                                continue
+                            continue
+
+                        self.log(
+                            f"{Fore.CYAN+Style.BRIGHT}Account   :{Style.RESET_ALL}"
+                            f"{Fore.WHITE+Style.BRIGHT} {x_name} {Style.RESET_ALL}"
+                        )
+
+                        if int(time.time()) > exp_time:
+                            self.log(
+                                f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
+                                f"{Fore.RED+Style.BRIGHT} Access Token Already Expired {Style.RESET_ALL}"
+                            )
+                            continue
                             
-                            await self.process_accounts(token, use_proxy, rotate_proxy)
-                            await asyncio.sleep(3)
+                        await self.process_accounts(token, use_proxy, rotate_proxy)
+                        await asyncio.sleep(3)
 
                 self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*64)
                 seconds = 12 * 60 * 60
